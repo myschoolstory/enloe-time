@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enloe Time</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for a better look */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #064e3b; /* Darker green */
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #facc15; /* Gold */
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #eab308; /* Darker Gold */
+        }
+        .news-item a {
+            transition: color 0.2s;
+        }
+        .news-item a:hover {
+            color: #fde047; /* Lighter yellow on hover */
+        }
+    </style>
+</head>
+<body class="bg-green-900 text-white antialiased">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-yellow-400 tracking-wider" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.4);">
+                Enloe Time
+            </h1>
+            <p id="current-time" class="text-lg text-green-200 mt-2"></p>
+        </header>
+
+        <!-- Schedule Selector -->
+        <div class="flex justify-center mb-8 bg-green-800/50 rounded-full p-1 max-w-xs mx-auto">
+            <button id="btn-a-lunch" class="w-1/2 py-2 px-4 rounded-full text-center font-semibold transition-all duration-300">A-Lunch</button>
+            <button id="btn-b-lunch" class="w-1/2 py-2 px-4 rounded-full text-center font-semibold transition-all duration-300">B-Lunch</button>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <!-- Schedule Progress (spans 2 columns on large screens) -->
+            <div class="lg:col-span-2 bg-green-800/50 p-6 rounded-2xl shadow-lg border border-green-700">
+                <h2 class="text-2xl font-bold text-yellow-400 mb-2">Current Period</h2>
+                <div id="schedule-display" class="space-y-4">
+                    <p id="current-period-name" class="text-3xl font-bold">Loading...</p>
+                    <div class="bg-green-900 rounded-full h-8 overflow-hidden border-2 border-green-700">
+                        <div id="progress-bar" class="bg-yellow-400 h-full rounded-full transition-all duration-500 ease-linear flex items-center justify-end pr-3">
+                           <span id="progress-text" class="text-green-900 font-bold text-sm"></span>
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-green-300 font-semibold">
+                        <span id="period-start-time">--:-- AM</span>
+                        <span id="time-remaining" class="font-bold text-yellow-400">--m --s remaining</span>
+                        <span id="period-end-time">--:-- AM</span>
+                    </div>
+                </div>
+                <div id="full-schedule-view" class="mt-6">
+                    <h3 class="text-xl font-bold text-yellow-400 mb-3">Full Schedule</h3>
+                    <ul id="schedule-list" class="space-y-2 text-green-200">
+                        <!-- Schedule items will be populated here -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Side Panels -->
+            <div class="space-y-8">
+                <!-- Weather Panel -->
+                <div class="bg-green-800/50 p-6 rounded-2xl shadow-lg border border-green-700">
+                    <h2 class="text-2xl font-bold text-yellow-400 mb-4">Raleigh, NC Weather</h2>
+                    <div id="weather-content" class="flex items-center space-x-4">
+                        <div id="weather-icon-container" class="w-20 h-20 text-yellow-400">
+                            <!-- Weather Icon will be injected here -->
+                        </div>
+                        <div>
+                            <p id="weather-temp" class="text-5xl font-bold">--°F</p>
+                            <p id="weather-desc" class="text-green-200">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- News Panel -->
+                <div class="bg-green-800/50 p-6 rounded-2xl shadow-lg border border-green-700 h-96 flex flex-col">
+                    <h2 class="text-2xl font-bold text-yellow-400 mb-4">WRAL Local News</h2>
+                    <div id="news-timeline" class="space-y-4 overflow-y-auto custom-scrollbar pr-2 flex-grow">
+                        <!-- News items will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM ELEMENTS ---
+            const currentTimeEl = document.getElementById('current-time');
+            const btnALunch = document.getElementById('btn-a-lunch');
+            const btnBLunch = document.getElementById('btn-b-lunch');
+            const currentPeriodNameEl = document.getElementById('current-period-name');
+            const progressBarEl = document.getElementById('progress-bar');
+            const progressTextEl = document.getElementById('progress-text');
+            const periodStartTimeEl = document.getElementById('period-start-time');
+            const periodEndTimeEl = document.getElementById('period-end-time');
+            const timeRemainingEl = document.getElementById('time-remaining');
+            const scheduleListEl = document.getElementById('schedule-list');
+            const newsTimelineEl = document.getElementById('news-timeline');
+            const weatherIconContainer = document.getElementById('weather-icon-container');
+            const weatherTempEl = document.getElementById('weather-temp');
+            const weatherDescEl = document.getElementById('weather-desc');
+
+            // --- SCHEDULE DATA ---
+            const schedules = {
+                'A-Lunch': [
+                    { name: '1st Period', start: '7:25', end: '8:52' },
+                    { name: '2nd Period', start: '8:58', end: '10:35' },
+                    { name: 'A-Lunch', start: '10:41', end: '11:16' },
+                    { name: '3rd Period (A)', start: '11:20', end: '12:47' },
+                    { name: '4th Period', start: '12:53', end: '14:20' } // 2:20 PM
+                ],
+                'B-Lunch': [
+                    { name: '1st Period', start: '7:25', end: '8:52' },
+                    { name: '2nd Period', start: '8:58', end: '10:35' },
+                    { name: '3rd Period (B)', start: '10:41', end: '12:08' },
+                    { name: 'B-Lunch', start: '12:12', end: '12:47' },
+                    { name: '4th Period', start: '12:53', end: '14:20' } // 2:20 PM
+                ]
+            };
+            
+            let activeSchedule = 'A-Lunch';
+
+            // --- UTILITY FUNCTIONS ---
+            const timeToMinutes = (timeStr) => {
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                return hours * 60 + minutes;
+            };
+
+            const formatTime12hr = (timeStr) => {
+                const [hours, minutes] = timeStr.split(':');
+                const h = parseInt(hours);
+                const ampm = h >= 12 ? 'PM' : 'AM';
+                const formattedHour = h % 12 === 0 ? 12 : h % 12;
+                return `${formattedHour}:${minutes} ${ampm}`;
+            };
+            
+            // --- UI UPDATE FUNCTIONS ---
+            const updateScheduleButtons = () => {
+                if (activeSchedule === 'A-Lunch') {
+                    btnALunch.classList.add('bg-yellow-400', 'text-green-900');
+                    btnALunch.classList.remove('text-white');
+                    btnBLunch.classList.remove('bg-yellow-400', 'text-green-900');
+                    btnBLunch.classList.add('text-white');
+                } else {
+                    btnBLunch.classList.add('bg-yellow-400', 'text-green-900');
+                    btnBLunch.classList.remove('text-white');
+                    btnALunch.classList.remove('bg-yellow-400', 'text-green-900');
+                    btnALunch.classList.add('text-white');
+                }
+                populateScheduleList();
+            };
+
+            const populateScheduleList = () => {
+                scheduleListEl.innerHTML = '';
+                schedules[activeSchedule].forEach(period => {
+                    const li = document.createElement('li');
+                    li.className = 'flex justify-between p-2 rounded-lg';
+                    li.innerHTML = `
+                        <span>${period.name}</span>
+                        <span class="font-semibold">${formatTime12hr(period.start)} - ${formatTime12hr(period.end)}</span>
+                    `;
+                    scheduleListEl.appendChild(li);
+                });
+            };
+            
+            const updateDisplay = () => {
+                const now = new Date();
+                currentTimeEl.textContent = now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + ' | ' + now.toLocaleTimeString();
+
+                const nowInMinutes = now.getHours() * 60 + now.getMinutes();
+                const currentSeconds = now.getSeconds();
+                
+                const schedule = schedules[activeSchedule];
+                let currentPeriod = null;
+                let nextPeriod = null;
+
+                for (let i = 0; i < schedule.length; i++) {
+                    const period = schedule[i];
+                    const start = timeToMinutes(period.start);
+                    const end = timeToMinutes(period.end);
+                    if (nowInMinutes >= start && nowInMinutes < end) {
+                        currentPeriod = period;
+                        break;
+                    }
+                    if (nowInMinutes < start && !nextPeriod) {
+                        nextPeriod = period;
+                    }
+                }
+
+                Array.from(scheduleListEl.children).forEach((li, index) => {
+                    li.classList.remove('bg-green-700/50');
+                    if (schedule[index] === currentPeriod) {
+                        li.classList.add('bg-green-700/50');
+                    }
+                });
+
+                if (currentPeriod) {
+                    const start = timeToMinutes(currentPeriod.start);
+                    const end = timeToMinutes(currentPeriod.end);
+                    const duration = end - start;
+                    const elapsed = nowInMinutes - start;
+                    const totalSecondsElapsed = elapsed * 60 + currentSeconds;
+                    const totalSecondsDuration = duration * 60;
+                    const percentage = (totalSecondsElapsed / totalSecondsDuration) * 100;
+                    
+                    const secondsRemaining = totalSecondsDuration - totalSecondsElapsed;
+                    const minutesRem = Math.floor(secondsRemaining / 60);
+                    const secondsRem = secondsRemaining % 60;
+
+                    currentPeriodNameEl.textContent = currentPeriod.name;
+                    periodStartTimeEl.textContent = formatTime12hr(currentPeriod.start);
+                    periodEndTimeEl.textContent = formatTime12hr(currentPeriod.end);
+                    timeRemainingEl.textContent = `${minutesRem}m ${secondsRem}s remaining`;
+                    progressBarEl.style.width = `${percentage}%`;
+                    progressTextEl.textContent = `${Math.round(percentage)}%`;
+
+                } else if (nextPeriod) {
+                    const startOfNext = timeToMinutes(nextPeriod.start);
+                    const secondsUntilNext = (startOfNext - nowInMinutes) * 60 - currentSeconds;
+                    const minutesUntil = Math.floor(secondsUntilNext / 60);
+                    const secondsUntil = secondsUntilNext % 60;
+
+                    currentPeriodNameEl.textContent = 'Passing Period';
+                    if (nowInMinutes < timeToMinutes(schedule[0].start)) {
+                        currentPeriodNameEl.textContent = 'Before School';
+                    }
+                    timeRemainingEl.textContent = `Next: ${nextPeriod.name} in ${minutesUntil}m ${secondsUntil}s`;
+                    periodStartTimeEl.textContent = '--:--';
+                    periodEndTimeEl.textContent = formatTime12hr(nextPeriod.start);
+                    progressBarEl.style.width = '0%';
+                    progressTextEl.textContent = '';
+                } else {
+                    currentPeriodNameEl.textContent = 'School is Over';
+                    timeRemainingEl.textContent = 'Have a great day!';
+                    periodStartTimeEl.textContent = '--:--';
+                    periodEndTimeEl.textContent = '--:--';
+                    progressBarEl.style.width = '100%';
+                    progressTextEl.textContent = 'Done!';
+                }
+            };
+            
+            // --- DATA FETCHING FUNCTIONS ---
+
+            const fetchWeather = async () => {
+                // Raleigh, NC coordinates
+                const lat = 35.78;
+                const lon = -78.64;
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&temperature_unit=fahrenheit`;
+
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error('Weather data not available.');
+                    const data = await response.json();
+                    
+                    const weather = data.current_weather;
+                    const temp = Math.round(weather.temperature);
+                    const weatherCode = weather.weathercode;
+
+                    const { description, icon } = getWeatherInfo(weatherCode);
+
+                    weatherTempEl.textContent = `${temp}°F`;
+                    weatherDescEl.textContent = description;
+                    weatherIconContainer.innerHTML = icon;
+
+                } catch (error) {
+                    console.error("Error fetching weather:", error);
+                    weatherDescEl.textContent = 'Could not load weather.';
+                }
+            };
+
+            const getWeatherInfo = (code) => {
+                // WMO Weather interpretation codes
+                const weatherMap = {
+                    0: { description: 'Clear sky', icon: '<svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>' },
+                    1: { description: 'Mainly clear', icon: '<svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h1m8-9v1m8.657 2.343l-.707.707M3.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707m1.414 12.728L12 18.5m7-7h-1M5 12H4m16 0h-1m-1 5.657l-.707-.707M12 21v-1m0-16V3"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>' },
+                    2: { description: 'Partly cloudy', icon: '<svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h1m8-9v1m8.657 2.343l-.707.707M3.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707m1.414 12.728L12 18.5m7-7h-1M5 12H4m16 0h-1m-1 5.657l-.707-.707M12 21v-1m0-16V3"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 17.5a9.91 9.91 0 01-3.5 2.5 10.12 10.12 0 01-6 0A9.91 9.91 0 015 17.5"></path></svg>' },
+                    3: { description: 'Overcast', icon: '<svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h1m8-9v1m8.657 2.343l-.707.707M3.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707m1.414 12.728L12 18.5m7-7h-1M5 12H4m16 0h-1m-1 5.657l-.707-.707M12 21v-1m0-16V3"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 17.5a9.91 9.91 0 01-3.5 2.5 10.12 10.12 0 01-6 0A9.91 9.91 0 015 17.5"></path></svg>' },
+                    45: { description: 'Fog', icon: '<svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>' },
+                    61: { description: 'Slight rain', icon: '<svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 10H6a4 4 0 00-4 4v1a4 4 0 004 4h12a4 4 0 004-4v-1a4 4 0 00-4-4z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14v6m-4-4l-1 1m9-1l1 1"></path></svg>' },
+                    80: { description: 'Rain showers', icon: '<svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 10H6a4 4 0 00-4 4v1a4 4 0 004 4h12a4 4 0 004-4v-1a4 4 0 00-4-4z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14v6m-4-4l-1 1m9-1l1 1"></path></svg>' },
+                    95: { description: 'Thunderstorm', icon: '<svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a5 5 0 01-4.5-3.5 4.5 4.5 0 018.5-2 5.5 5.5 0 015.5 5.5A4.5 4.5 0 0118 17H9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17l-2 4h4l-2-4z"></path></svg>' },
+                };
+                return weatherMap[code] || { description: 'Cloudy', icon: weatherMap[3].icon }; // Default to cloudy
+            };
+
+            const fetchNews = async () => {
+                const rssUrl = 'http://www.wral.com/news/rss/142/';
+                // Using a CORS proxy to fetch the RSS feed
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
+                newsTimelineEl.innerHTML = '<p class="text-green-200">Loading news...</p>';
+
+                try {
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) throw new Error('Network response was not ok.');
+                    const data = await response.json();
+                    const xmlString = data.contents;
+                    
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+                    
+                    const items = xmlDoc.querySelectorAll("item");
+                    newsTimelineEl.innerHTML = ''; // Clear loading message
+
+                    let itemCount = 0;
+                    items.forEach(item => {
+                        if (itemCount >= 10) return; // Limit to 10 news items
+
+                        const title = item.querySelector("title").textContent;
+                        const link = item.querySelector("link").textContent;
+                        const description = item.querySelector("description").textContent;
+                        const pubDate = new Date(item.querySelector("pubDate").textContent);
+
+                        const dateString = pubDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                        const div = document.createElement('div');
+                        div.className = 'flex items-start space-x-3 news-item';
+                        div.innerHTML = `
+                            <div class="flex-shrink-0 bg-yellow-400 text-green-900 rounded-md p-2 text-center w-16">
+                                <p class="font-bold text-sm">${dateString.split(' ')[0]}</p>
+                                <p class="font-semibold text-lg">${dateString.split(' ')[1]}</p>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-white"><a href="${link}" target="_blank" rel="noopener noreferrer">${title}</a></h4>
+                                <p class="text-sm text-green-200">${description.substring(0, 100)}...</p>
+                            </div>
+                        `;
+                        newsTimelineEl.appendChild(div);
+                        itemCount++;
+                    });
+
+                } catch (error) {
+                    console.error("Error fetching news:", error);
+                    newsTimelineEl.innerHTML = '<p class="text-red-400">Could not load news feed.</p>';
+                }
+            };
+
+            // --- EVENT LISTENERS ---
+            btnALunch.addEventListener('click', () => {
+                activeSchedule = 'A-Lunch';
+                updateScheduleButtons();
+                updateDisplay();
+            });
+
+            btnBLunch.addEventListener('click', () => {
+                activeSchedule = 'B-Lunch';
+                updateScheduleButtons();
+                updateDisplay();
+            });
+
+            // --- INITIALIZATION ---
+            updateScheduleButtons();
+            fetchWeather();
+            fetchNews();
+            updateDisplay(); // Initial call
+            setInterval(updateDisplay, 1000); // Update every second
+        });
+    </script>
+</body>
+</html>
